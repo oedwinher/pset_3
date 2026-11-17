@@ -1,0 +1,30 @@
+# Variables de entorno y credenciales
+.env
+
+# Entornos virtuales y caché de Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# Caché local de snapshots de Snowflake (regenerable con src/datos.py)
+data/*.parquet
+data/*.json
+
+# MLflow local y bases temporales
+mlflow_data/
+mlruns/
+mlartifacts/
+*.db
+*.sqlite
+*.duckdb
+*.tmp
+*.log
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
