@@ -19,6 +19,7 @@ data/*.json
 mlflow_data/
 mlruns/
 mlartifacts/
+catboost_info/
 *.db
 *.sqlite
 *.duckdb
