@@ -6,16 +6,21 @@ Proyecto de experimentación reproducible de Machine Learning para el **nowcasti
 
 ## Resumen de Resultados
 
-- **Fuentes de datos (Snowflake):** `PSET2_DB.ANALYTICS.OBT_NOWCASTING_VENTAS` (12,635 filas; 6,287 en `temprano_15d`) cruzada al 100% con `PSET2_DB.ANALYTICS.PRECIOS_RAMA_CNT46` (`data/precios.xlsx`, 46 ramas × 141 meses).
+- **Fuentes de datos (Snowflake) y Estado de Acceso (Observaciones 1 y 3 PSet #1):**
+  - `PSET2_DB.ANALYTICS.OBT_NOWCASTING_VENTAS` (Formulario 104 SRI): **Acceso Medio** (mientras no esté formalizado en producción el corte temprano automático del día 15, se reconstruyeron los cortes históricos filtrando por `fecha_recepcion <= cierre + 15d`, cubriendo **6,287 de 6,348** pares rama×mes = **99.04%**, con **61 cortes tempranos ausentes** en la rama `020` entre `201701` y `202301`).
+  - `PSET2_DB.ANALYTICS.PRECIOS_RAMA_CNT46` (`data/precios.xlsx`, 46 ramas × 141 meses): **Acceso Alto / Formalizado (100.00%, 0 nulos)**.
+- **Transformación Ventas F104 → Valor Agregado Bruto (VAB) del IMAEC (Observación 2 PSet #1):** Bajo coeficientes técnicos fijos de corto plazo ($c_i = \text{CI}_i / \text{VBP}_i$), el volumen del VAB sectorial ($\text{VAB}_{i,t} = (1 - c_i)\text{VBP}_{i,t}$) evoluciona proporcionalmente a las ventas reales deflactadas con `INDICE_PRECIO_REAL` ($\Delta\% \text{VAB}_{i,t} \approx \Delta\% \text{VentasReales}_{i,t}$), permitiendo estimar al día 15 la tasa interanual del IMAEC Flash ($\widehat{g}_t^{(15\text{d})}$) y su **Error de Revisión Macroeconómica ($\text{ER}_t = |\widehat{g}_t^{(15\text{d})} - g_t^{(\text{def})}|$, en puntos porcentuales `pp`)**.
+- **Sustitución de la Métrica de Viabilidad de Negocio (Observación 4 PSet #1 / Sección 3 PSet #3):** Se sustituyó el conteo administrativo de *"decisiones que citan el Flash"* por el **Costo de Revisión Asimétrico (`costo_negocio_musd`, penalización `1.5×` a sobreestimación vs. `1.0×` a subestimación)**, el **Error de Revisión del IMAEC (`pp`)** y el **Índice de Utilidad Relativa frente al Procedimiento Actual (`HeuristicaBCE`): $\text{IUP} = (1 - \text{Costo}(\text{Modelo})/\text{Costo}(\text{HeuristicaBCE}))\times 100$**.
 - **Partición temporal sin fuga:**
   - *Warm-up* causal (`lag_12`): `2015-01` a `2015-12` (552 filas)
   - Entrenamiento + CV (`TimeSeriesSplit(n_splits=5)` mensual): `2016-01` a `2024-12` (4,907 filas)
   - Prueba *hold-out* final (intocable hasta `05_seleccion.ipynb`): `2025-01` a `2026-06` (828 filas)
 - **Modelo ganador (`@champion`):** `tuning_lasso` (`Lasso`, `alpha=3.6361`), versión **1** en el Model Registry `nowcasting-f104-modelo` (`run_id`: `b4bd242a500b42eea087a6cc9918097a`):
-  - **MAE CV (5 pliegues):** `13.9173 ± 1.1121 M USD` reales
-  - **MAE Hold-Out (828 filas):** `14.7905 M USD` reales (`RMSE = 27.1961 M`, `R² = 0.9995`)
-  - **WAPE Hold-Out:** `3.267%` (error agregado mensual a nivel IMAEC Flash de las 46 ramas: `0.57%`)
-  - **Costo asimétrico de negocio Hold-Out:** `18.6305 M USD` (latencia de inferencia: `3.784 ms` por lote de 828 filas)
+  - **MAE CV (5 pliegues):** `13.9173 ± 1.1121 M USD` reales (`IUP CV = +2.82%` vs. `HeuristicaBCE`)
+  - **MAE Hold-Out (828 filas):** `14.7905 M USD` reales (`RMSE = 27.1961 M`, `R² = 0.9995`, **-4.17%** vs. `HeuristicaBCE = 15.4340 M`)
+  - **WAPE / MAPE Sectorial Hold-Out:** `WAPE = 3.267%`, `MAPE sectorial = 8.54%`, `WAPE agregado IMAEC Flash = 0.571%`
+  - **Error de Revisión del IMAEC Hold-Out:** `0.614 pp` promedio / `0.424 pp` mediana (**-21.5%** frente a `0.781 pp` / `0.688 pp` de `HeuristicaBCE`)
+  - **Costo Asimétrico e Índice de Utilidad Relativa Hold-Out:** `18.6305 M USD` (**`IUP = +6.15%`** de ganancia neta frente a `19.8506 M USD` de `HeuristicaBCE`; latencia: `3.784 ms` por lote de 828 filas)
 - **Segundo mejor (`@challenger`):** `tuning_ridge` (`Ridge`, `alpha=0.4238`), versión **2** (`run_id`: `2ae1ddac80d24c5d92acc83b3f4f6b01`), con `MAE CV = 16.5067 ± 1.8505 M USD` y `MAE Hold-Out = 17.0578 M USD`.
 
 ---

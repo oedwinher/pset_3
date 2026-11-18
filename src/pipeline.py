@@ -216,6 +216,79 @@ def calcular_metricas(y_real: np.ndarray | pd.Series, y_pred: np.ndarray) -> dic
     }
 
 
+def calcular_mape_sectorial_pct(y_real: np.ndarray | pd.Series, y_pred: np.ndarray) -> float:
+    """MAPE sectorial acotado (%) sobre ramas activas: mean(|y - y_hat| / max(|y|, 1.0)) * 100."""
+    real = np.asarray(y_real, dtype=float)
+    pred = np.clip(np.asarray(y_pred, dtype=float), 0.0, None)
+    denom = np.maximum(np.abs(real), 1.0)
+    return float(np.mean(np.abs(real - pred) / denom) * 100.0)
+
+
+def calcular_error_revision_imaec_pp(
+    df_particion: pd.DataFrame,
+    y_real: np.ndarray | pd.Series,
+    y_pred: np.ndarray,
+) -> dict[str, float]:
+    """Puente Ventas Reales F104 -> VAB del IMAEC Flash y Error de Revisión en puntos porcentuales (pp).
+
+    Bajo el supuesto de coeficientes técnicos fijos de corto plazo de Cuentas Nacionales
+    (VAB_{i,t} = alpha_i * VentasReales_{i,t}), la tasa de variación interanual del agregado
+    real respecto a t-12 (ventas_definitivo_real_lag12_musd) aproxima la variación interanual
+    del IMAEC Flash (g_hat_t) frente a la variación definitiva (g_def_t).
+    El Error de Revisión mensual es |g_hat_t - g_def_t| en puntos porcentuales (pp).
+    """
+    aux = pd.DataFrame({
+        "FECHA_MES": pd.to_datetime(df_particion["FECHA_MES"]).values,
+        "real_t": np.asarray(y_real, dtype=float),
+        "pred_t": np.clip(np.asarray(y_pred, dtype=float), 0.0, None),
+        "real_t12": np.asarray(df_particion["ventas_definitivo_real_lag12_musd"], dtype=float),
+    })
+    valid = aux.dropna(subset=["real_t12"])
+    mensual = valid.groupby("FECHA_MES")[["real_t", "pred_t", "real_t12"]].sum()
+    mensual = mensual[mensual["real_t12"] > 0]
+
+    g_def_pct = (mensual["real_t"] / mensual["real_t12"] - 1.0) * 100.0
+    g_flash_pct = (mensual["pred_t"] / mensual["real_t12"] - 1.0) * 100.0
+    err_rev_pp = np.abs(g_flash_pct - g_def_pct)
+    wape_agg_pct = float(
+        np.abs(mensual["real_t"] - mensual["pred_t"]).sum() / mensual["real_t"].sum() * 100.0
+    )
+    return {
+        "error_revision_imaec_pp": float(err_rev_pp.mean()),
+        "error_revision_mediana_pp": float(err_rev_pp.median()),
+        "error_revision_max_pp": float(err_rev_pp.max()),
+        "wape_agregado_imaec_pct": wape_agg_pct,
+    }
+
+
+def calcular_utilidad_relativa_pct(costo_modelo: float, costo_procedimiento_actual: float) -> float:
+    """Índice de Utilidad Relativa (%) frente al procedimiento heurístico actual (HeuristicaBCE)."""
+    if costo_procedimiento_actual <= 0:
+        return 0.0
+    return float((1.0 - costo_modelo / costo_procedimiento_actual) * 100.0)
+
+
+def evaluar_metas_pset1(
+    df_particion: pd.DataFrame,
+    y_real: np.ndarray | pd.Series,
+    y_pred: np.ndarray,
+    costo_base_bce: float | None = None,
+    y_pred_baseline_bce: np.ndarray | None = None,
+) -> dict[str, float]:
+    """Consolida métricas técnicas, de negocio y de Cuentas Nacionales (retroalimentación PSet #1)."""
+    base = calcular_metricas(y_real, y_pred)
+    base["mape_sectorial_pct"] = calcular_mape_sectorial_pct(y_real, y_pred)
+    rev = calcular_error_revision_imaec_pp(df_particion, y_real, y_pred)
+    base.update(rev)
+    if costo_base_bce is None and y_pred_baseline_bce is not None:
+        costo_base_bce = calcular_costo_negocio_musd(y_real, y_pred_baseline_bce)
+    if costo_base_bce is not None:
+        base["utilidad_relativa_vs_bce_pct"] = calcular_utilidad_relativa_pct(
+            base["costo_negocio_musd"], costo_base_bce
+        )
+    return base
+
+
 class HeuristicaBCE(BaseEstimator, RegressorMixin):
     """Línea base de negocio (PSet #1): extrapolación directa por cobertura histórica 12m.
 
