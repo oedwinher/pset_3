@@ -43,8 +43,17 @@ pset_3/
 │   └── 05_seleccion.ipynb          # Hold-out único, Model Registry (@champion/@challenger) y exportación
 └── docs/
     ├── corridas.csv                # Bitácora completa exportada desde MLflow (105 corridas)
-    └── PSet3_memo_Ortega_Pasmay.pdf# Memorando técnico ejecutivo (6 páginas)
+    ├── PSet3_memo_Ortega_Pasmay.pdf# Documento oficial de entrega (6 páginas)
+    └── PSet3_memo_Ortega_Pasmay.docx# Versión editable en formato Word (6 páginas)
 ```
+
+---
+
+## Documento Técnico y Evidencia Experimental (`docs/`)
+
+- `docs/PSet3_memo_Ortega_Pasmay.pdf` (Documento oficial de entrega, 6 páginas)
+- `docs/PSet3_memo_Ortega_Pasmay.docx` (Versión editable en formato Word)
+- `docs/corridas.csv` (Exportación íntegra de las 105 corridas registradas en MLflow mediante `mlflow.search_runs`)
 
 ---
 
